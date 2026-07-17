@@ -16,17 +16,39 @@ const router = createRouter({
       name: 'dashboard',
       component: () => import('@/views/DashboardView.vue'),
       meta: { requiresAuth: true }
-    }
+    },
+    {
+      path: '/os',
+      name: 'ordens',
+      component: () => import('@/views/OrdensView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/equipamentos',
+      name: 'equipamentos',
+      component: () => import('@/views/EquipamentosView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/clientes',
+      name: 'clientes',
+      component: () => import('@/views/ClientesView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/prestadores',
+      name: 'prestadores',
+      component: () => import('@/views/PrestadoresView.vue'),
+      meta: { requiresAuth: true }
+    },
   ],
 })
 
 // Navigation Guard
 router.beforeEach((to, from, next) => {
   const requiresAuth = to.meta.requiresAuth
-  // We wrap the check in a Promise to wait for the auth state to be resolved 
-  // on initial page load if the auth object isn't fully initialized.
   const unsubscribe = onAuthStateChanged(auth, (user) => {
-    unsubscribe() // We only want to check the current state once per route navigation
+    unsubscribe()
     if (requiresAuth && !user) {
       next('/login')
     } else if (to.path === '/login' && user) {
