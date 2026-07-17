@@ -173,7 +173,7 @@ const totalAtivos = computed(() => clientes.value.filter(c => c.status === 'ativ
           <thead class="bg-slate-50 border-b border-slate-200">
             <tr>
               <th
-                v-for="header in table.getHeaderGroups()[0].headers"
+                v-for="header in (table.getHeaderGroups()[0]?.headers ?? [])"
                 :key="header.id"
                 class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider"
               >

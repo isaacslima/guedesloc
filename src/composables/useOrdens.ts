@@ -26,7 +26,8 @@ async function gerarNumeroOS(): Promise<string> {
     const num = d.data().numero as string | undefined
     if (num) {
       const parts = num.split('-')
-      const n = parseInt(parts[parts.length - 1], 10)
+      const last = parts[parts.length - 1]
+      const n = last !== undefined ? parseInt(last, 10) : NaN
       if (!isNaN(n) && n > maxNum) maxNum = n
     }
   })
@@ -67,15 +68,17 @@ export function useOrdens() {
 
   const addOrdem = async (input: OrdemDeServicoInput) => {
     const numero = await gerarNumeroOS()
+    const cleanInput = Object.fromEntries(Object.entries(input).filter(([_, v]) => v !== undefined))
     await addDoc(collection(db, 'ordens'), {
-      ...input,
+      ...cleanInput,
       numero,
       dataCriacao: serverTimestamp(),
     })
   }
 
   const updateOrdem = async (id: string, input: Partial<OrdemDeServicoInput>) => {
-    await updateDoc(doc(db, 'ordens', id), { ...input })
+    const cleanInput = Object.fromEntries(Object.entries(input).filter(([_, v]) => v !== undefined))
+    await updateDoc(doc(db, 'ordens', id), cleanInput)
   }
 
   const deleteOrdem = async (id: string) => {

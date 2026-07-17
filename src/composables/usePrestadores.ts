@@ -41,14 +41,16 @@ export function usePrestadores() {
   }
 
   const addPrestador = async (input: PrestadorInput) => {
+    const cleanInput = Object.fromEntries(Object.entries(input).filter(([_, v]) => v !== undefined))
     await addDoc(collection(db, 'prestadores'), {
-      ...input,
+      ...cleanInput,
       criadoEm: serverTimestamp(),
     })
   }
 
   const updatePrestador = async (id: string, input: Partial<PrestadorInput>) => {
-    await updateDoc(doc(db, 'prestadores', id), { ...input })
+    const cleanInput = Object.fromEntries(Object.entries(input).filter(([_, v]) => v !== undefined))
+    await updateDoc(doc(db, 'prestadores', id), cleanInput)
   }
 
   const deletePrestador = async (id: string) => {

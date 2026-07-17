@@ -42,14 +42,16 @@ export function useClientes() {
   }
 
   const addCliente = async (input: ClienteInput) => {
+    const cleanInput = Object.fromEntries(Object.entries(input).filter(([_, v]) => v !== undefined))
     await addDoc(collection(db, 'clientes'), {
-      ...input,
+      ...cleanInput,
       criadoEm: serverTimestamp(),
     })
   }
 
   const updateCliente = async (id: string, input: Partial<ClienteInput>) => {
-    await updateDoc(doc(db, 'clientes', id), { ...input })
+    const cleanInput = Object.fromEntries(Object.entries(input).filter(([_, v]) => v !== undefined))
+    await updateDoc(doc(db, 'clientes', id), cleanInput)
   }
 
   const deleteCliente = async (id: string) => {

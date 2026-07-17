@@ -43,14 +43,16 @@ export function useEquipamentos() {
   }
 
   const addEquipamento = async (input: EquipamentoInput) => {
+    const cleanInput = Object.fromEntries(Object.entries(input).filter(([_, v]) => v !== undefined))
     await addDoc(collection(db, 'equipamentos'), {
-      ...input,
+      ...cleanInput,
       criadoEm: serverTimestamp(),
     })
   }
 
   const updateEquipamento = async (id: string, input: Partial<EquipamentoInput>) => {
-    await updateDoc(doc(db, 'equipamentos', id), { ...input })
+    const cleanInput = Object.fromEntries(Object.entries(input).filter(([_, v]) => v !== undefined))
+    await updateDoc(doc(db, 'equipamentos', id), cleanInput)
   }
 
   const deleteEquipamento = async (id: string) => {
