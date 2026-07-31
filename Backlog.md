@@ -251,12 +251,12 @@ Princípio central: **cada seguradora é um "adapter"** (API real ou RPA) que fa
 ## EPIC 7 — Infraestrutura GCP
 
 ### Card 7.1 — Provisionamento de projeto e ambientes
-**Descrição:** Estruturar projetos GCP separados (ou ao menos ambientes isolados) para dev, homologação e produção, com IAM adequado.
+**Descrição:** Estruturar projetos GCP separados (ou ao menos ambientes isolados) para homologação e produção, com IAM adequado.
 
 **Critérios de aceite:**
-- Ambientes dev/hml/prod isolados.
+- Ambientes de hml/prod isolados.
 - IAM com princípio de menor privilégio por serviço.
-- Infra como código (Terraform, se possível) versionada.
+- Infra como código (Terraform) versionada.
 
 ### Card 7.2 — Cloud Run para serviços de API e adapters
 **Descrição:** Cada adapter e o Gateway rodam como serviços Cloud Run independentes, com deploy via CI/CD.
