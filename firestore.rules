@@ -28,6 +28,16 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    // ─── Integradoras (Central de Integrações) ───────────────────
+    match /integradoras/{integradoraId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ─── Logs de Idempotência ────────────────────────────────────
+    match /idempotencia_logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // ─── Regra de fallback: nega tudo que não foi explicitado ─────
     match /{document=**} {
       allow read, write: if isAuthenticated();

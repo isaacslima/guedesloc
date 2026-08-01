@@ -8,6 +8,7 @@ const navItems = [
   { to: '/equipamentos', label: 'Equipamentos', icon: '⚙️', exact: false },
   { to: '/clientes', label: 'Clientes', icon: '🏢', exact: false },
   { to: '/prestadores', label: 'Prestadores', icon: '👷', exact: false },
+  { to: '/integracoes', label: 'Integrações', icon: '🔌', exact: false },
 ]
 </script>
 

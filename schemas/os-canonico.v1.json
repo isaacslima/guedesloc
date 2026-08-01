@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://guedesloc.com.br/schemas/os-canonico.v1.json",
+  "title": "OrdemDeServicoCanonica",
+  "description": "Modelo canônico de Ordem de Serviço da Central de Integrações Guedesloc",
+  "type": "object",
+  "required": [
+    "idempotencyKey",
+    "numeroOsSeguradora",
+    "seguradoraId",
+    "seguradoraNome",
+    "cliente",
+    "servico",
+    "status",
+    "datas"
+  ],
+  "properties": {
+    "idempotencyKey": {
+      "type": "string",
+      "description": "Chave única de idempotência: {seguradoraId}:{numeroOsSeguradora}"
+    },
+    "numeroOsSeguradora": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seguradoraId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seguradoraNome": {
+      "type": "string",
+      "minLength": 1
+    },
+    "numeroOsInterno": {
+      "type": "string"
+    },
+    "cliente": {
+      "type": "object",
+      "required": ["nome", "endereco"],
+      "properties": {
+        "nome": { "type": "string", "minLength": 1 },
+        "cpfCnpj": { "type": "string" },
+        "telefone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "endereco": { "type": "string", "minLength": 1 },
+        "cidade": { "type": "string" },
+        "estado": { "type": "string" },
+        "cep": { "type": "string" }
+      }
+    },
+    "servico": {
+      "type": "object",
+      "required": ["tipo", "descricao", "valor"],
+      "properties": {
+        "tipo": { "type": "string", "minLength": 1 },
+        "descricao": { "type": "string" },
+        "valor": { "type": "number", "minimum": 0 }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["aberta", "em_andamento", "concluida", "cancelada"]
+    },
+    "prestador": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "cpfCnpj": { "type": "string" },
+        "telefone": { "type": "string" }
+      }
+    },
+    "datas": {
+      "type": "object",
+      "required": ["criacao"],
+      "properties": {
+        "criacao": { "type": "string", "format": "date-time" },
+        "agendamento": { "type": "string", "format": "date-time" },
+        "conclusao": { "type": "string", "format": "date-time" }
+      }
+    },
+    "camposAdicionais": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}
