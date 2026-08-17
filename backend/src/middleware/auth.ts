@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import { logger } from '../services/logger.js'
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -31,6 +32,11 @@ export function serviceAuthMiddleware(req: AuthenticatedRequest, res: Response, 
     return next()
   }
 
+  logger.warn('Requisição rejeitada: credencial de serviço ausente/inválida', {
+    path: req.originalUrl,
+    temApiKey: Boolean(apiKey),
+    temBearer: Boolean(authHeader?.startsWith('Bearer ')),
+  })
   res.status(401).json({
     sucesso: false,
     erro: 'Não autorizado: Credencial de serviço (x-api-key ou Bearer token IAM) inválida.',

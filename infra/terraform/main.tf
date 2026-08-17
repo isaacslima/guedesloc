@@ -90,3 +90,14 @@ resource "google_secret_manager_secret_iam_member" "secret_access" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.gateway_sa.email}"
 }
+
+# ─── 5. Cloud Logging (Card 8.1 do backlog) ──────────────────────
+# Permite ao Gateway e ao RPA (integracoes/juvo) escreverem logs
+# estruturados no Cloud Logging quando CLOUD_LOGGING_ENABLED=true. Sem essa
+# role, a chamada de escrita volta com PERMISSION_DENIED
+# (logging.logEntries.create).
+resource "google_project_iam_member" "gateway_sa_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.gateway_sa.email}"
+}

@@ -1,3 +1,5 @@
+import { logger } from './logger.js'
+
 export type TipoEventoOS = 'os.criada' | 'os.status_alterado' | 'os.cancelada' | 'os.finalizada'
 
 export interface EventoPayload {
@@ -11,14 +13,15 @@ export interface EventoPayload {
 export async function publicarEventoOS(tipoEvento: TipoEventoOS, payload: EventoPayload): Promise<boolean> {
   try {
     const topicName = tipoEvento // ex: os.criada
-    console.log(`[PubSub] Evento publicado no topico '${topicName}':`, {
-      id: payload.id,
+    logger.info(`Evento publicado no tópico '${topicName}'`, {
+      eventoId: payload.id,
       idempotencyKey: payload.idempotencyKey,
       timestamp: payload.timestamp,
     })
     return true
   } catch (error) {
-    console.error(`[PubSub] Erro ao publicar evento no topico '${tipoEvento}':`, error)
+    const err = error as Error
+    logger.error(`Erro ao publicar evento no tópico '${tipoEvento}'`, { erro: err.message, idempotencyKey: payload.idempotencyKey })
     return false
   }
 }

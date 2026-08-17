@@ -33,6 +33,14 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    // ─── Ordens de Serviço integradas (via Gateway) ───────────────
+    // Só o Gateway (backend/, com firebase-admin) escreve aqui — o front só
+    // lê. O Admin SDK ignora estas regras, então "write" segue liberado só
+    // pra manter o padrão das outras coleções; nada no front chama add/update/delete.
+    match /ordens_integradas/{ordemId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // ─── Logs de Idempotência ────────────────────────────────────
     match /idempotencia_logs/{logId} {
       allow read, write: if isAuthenticated();

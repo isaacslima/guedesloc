@@ -5,6 +5,7 @@ import { RouterLink, useLink } from 'vue-router'
 const navItems = [
   { to: '/', label: 'Dashboard', icon: '🏠', exact: true },
   { to: '/os', label: 'Ordens de Serviço', icon: '📋', exact: false },
+  { to: '/os-integradas', label: 'OS Integradas', icon: '🔄', exact: false },
   { to: '/equipamentos', label: 'Equipamentos', icon: '⚙️', exact: false },
   { to: '/clientes', label: 'Clientes', icon: '🏢', exact: false },
   { to: '/prestadores', label: 'Prestadores', icon: '👷', exact: false },

@@ -1,5 +1,7 @@
+import 'dotenv/config'
+import { randomUUID } from 'node:crypto'
 import express from 'express'
-import type { Request, Response } from 'express'
+import type { NextFunction, Request, Response } from 'express'
 import { serviceAuthMiddleware } from './middleware/auth.js'
 import {
   verificarEBloquearIdempotencia,
@@ -7,11 +9,36 @@ import {
   registrarErroIdempotencia,
 } from './services/idempotency.js'
 import { publicarEventoOS, type TipoEventoOS } from './services/pubsub.js'
+import { db, FieldValue, sanitizarIdDocumento } from './services/firestore.js'
+import { logger } from './services/logger.js'
+
+interface RequestComId extends Request {
+  requestId?: string
+}
 
 const app = express()
 const PORT = process.env.PORT || 8080
 
 app.use(express.json())
+
+// Loga toda requisição (método, rota, status, duração) — sem isso, falhas
+// silenciosas (ex.: 401 de auth, 422 de validação) nunca aparecem em lugar
+// nenhum (backlog Card 8.1).
+app.use((req: RequestComId, res: Response, next: NextFunction) => {
+  const requestId = randomUUID()
+  const inicio = Date.now()
+  req.requestId = requestId
+
+  res.on('finish', () => {
+    const duracaoMs = Date.now() - inicio
+    const dados = { method: req.method, path: req.originalUrl, statusCode: res.statusCode, duracaoMs }
+    if (res.statusCode >= 500) logger.error(`${req.method} ${req.originalUrl} ${res.statusCode}`, dados, { requestId })
+    else if (res.statusCode >= 400) logger.warn(`${req.method} ${req.originalUrl} ${res.statusCode}`, dados, { requestId })
+    else logger.info(`${req.method} ${req.originalUrl} ${res.statusCode}`, dados, { requestId })
+  })
+
+  next()
+})
 
 // Healthcheck
 app.get('/health', (_req: Request, res: Response) => {
@@ -19,7 +46,7 @@ app.get('/health', (_req: Request, res: Response) => {
 })
 
 // Ingestão Canônica de OS v1 (API Gateway)
-app.post('/api/v1/os/ingest', serviceAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+app.post('/api/v1/os/ingest', serviceAuthMiddleware, async (req: RequestComId, res: Response): Promise<void> => {
   try {
     const payload = req.body
 
@@ -53,6 +80,16 @@ app.post('/api/v1/os/ingest', serviceAuthMiddleware, async (req: Request, res: R
       return
     }
 
+    // Grava no Firestore — único ponto de escrita de OS (backlog Card 3.1).
+    // idempotencyKey como ID do documento: reenvio (ou reinício do Gateway,
+    // que zera o Map em memória) só sobrescreve, nunca duplica.
+    await db
+      .collection('ordens_integradas')
+      .doc(sanitizarIdDocumento(idempotencyKey))
+      .set({ ...payload, atualizadoEm: FieldValue.serverTimestamp() }, { merge: true })
+
+    logger.info('OS gravada no Firestore', { idempotencyKey, seguradoraId, numeroOsSeguradora, status }, { requestId: req.requestId ?? '' })
+
     // Determina o eventoPubSub
     let tipoEvento: TipoEventoOS = 'os.criada'
     if (status === 'concluida') tipoEvento = 'os.finalizada'
@@ -69,7 +106,7 @@ app.post('/api/v1/os/ingest', serviceAuthMiddleware, async (req: Request, res: R
       payloadOS: payload,
     })
 
-    await registrarSucessoIdempotencia(idempotencyKey)
+    await registrarSucessoIdempotencia(idempotencyKey, seguradoraId, numeroOsSeguradora)
 
     res.status(201).json({
       sucesso: true,
@@ -81,14 +118,24 @@ app.post('/api/v1/os/ingest', serviceAuthMiddleware, async (req: Request, res: R
     })
   } catch (error) {
     const err = error as Error
-    console.error('[Gateway API Error]:', err)
+    logger.error('Erro ao processar ingestão de OS', { erro: err.message, stack: err.stack }, { requestId: req.requestId ?? '' })
+    // Nunca deixar uma falha secundária aqui (ex.: Firestore) escapar do
+    // catch e derrubar o processo — isso já aconteceu (ver commit que
+    // corrigiu OS com "/" no id) porque o erro original já está sendo
+    // tratado; uma segunda exceção não pode virar rejection não tratada.
     if (req.body?.idempotencyKey) {
-      await registrarErroIdempotencia(req.body.idempotencyKey)
+      try {
+        await registrarErroIdempotencia(req.body.idempotencyKey, req.body?.seguradoraId, req.body?.numeroOsSeguradora)
+      } catch (erroSecundario) {
+        logger.error('Falha ao registrar erro de idempotência (secundária, ignorada)', {
+          erro: erroSecundario instanceof Error ? erroSecundario.message : String(erroSecundario),
+        }, { requestId: req.requestId ?? '' })
+      }
     }
     res.status(500).json({ sucesso: false, erro: 'Erro interno ao processar ingestão de OS.', detalhe: err.message })
   }
 })
 
 app.listen(PORT, () => {
-  console.log(`🚀 Gateway Backend rodando na porta ${PORT}`)
+  logger.info(`Gateway Backend rodando na porta ${PORT}`, { port: PORT })
 })

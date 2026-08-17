@@ -47,6 +47,12 @@ const router = createRouter({
       component: () => import('@/views/IntegracoesView.vue'),
       meta: { requiresAuth: true }
     },
+    {
+      path: '/os-integradas',
+      name: 'ordens-integradas',
+      component: () => import('@/views/OrdensIntegradasView.vue'),
+      meta: { requiresAuth: true }
+    },
   ],
 })
 

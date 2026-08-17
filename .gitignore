@@ -9,6 +9,12 @@ lerna-debug.log*
 
 node_modules
 .DS_Store
+backend/.env
+
+# Chaves de service account do GCP/Firebase (nunca commitar)
+*firebase-adminsdk*.json
+serviceAccountKey.json
+
 dist
 dist-ssr
 coverage
