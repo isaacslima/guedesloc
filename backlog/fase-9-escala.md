@@ -1,6 +1,6 @@
-# Fase 3 — Escala
+# Fase 9 — Escala
 
-> **Objetivo:** Replicar o padrão de integração (Adapters API + Workers RPA) validado no piloto para todas as demais seguradoras do ecossistema.
+> **Objetivo:** Replicar o padrão de integração (Adapters API + Workers RPA) validado no piloto (Fase 1) para todas as demais seguradoras do ecossistema. Reposicionada para depois do núcleo operacional (Fases 2-6): cada nova seguradora já nasce gravando no modelo unificado de OS (Fase 2), com kanban, distribuição e WhatsApp prontos, em vez de alimentar um modelo que ainda vai mudar.
 
 ---
 

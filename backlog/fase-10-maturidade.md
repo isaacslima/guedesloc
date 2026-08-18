@@ -1,6 +1,6 @@
-# Fase 4 — Maturidade, Resiliência e Automação
+# Fase 10 — Maturidade, Resiliência e Automação
 
-> **Objetivo:** Elevar o nível de maturidade operacional da plataforma com resiliência avançada de RPA, automação bancária fim a fim e conformidade estrita com LGPD e auditoria de segurança.
+> **Objetivo:** Elevar o nível de maturidade operacional da plataforma com resiliência avançada de RPA, automação bancária fim a fim e conformidade estrita com LGPD e auditoria de segurança. Reposicionada para o final por depender de volume real de seguradoras (Fase 9) e do fluxo financeiro já rodando (Fase 7) para priorizar automação de pagamento e resiliência em escala. O Card 8.3 (log de auditoria imutável) é a base técnica que alimenta a tela de Auditoria de negócio do Card 14.3 (Fase 8); o Card 4.4 passa a cobrir também evidências de foto de entrega recebidas via WhatsApp (Fase 4/5); o Card 8.4 passa a cobrir também as credenciais do provedor de WhatsApp (Z-API).
 
 ---
 

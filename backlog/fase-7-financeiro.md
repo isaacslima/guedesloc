@@ -1,6 +1,6 @@
-# Fase 2 — Financeiro
+# Fase 7 — Financeiro
 
-> **Objetivo:** Implementar os módulos de Gestão de Recebíveis (faturamento junto às seguradoras) e Gestão de Pagamentos a Prestadores/Terceirizados, já alimentados por dados reais das OS vindas da Fase 1 (Piloto).
+> **Objetivo:** Implementar os módulos de Gestão de Recebíveis (faturamento junto às seguradoras) e Gestão de Pagamentos a Prestadores/Terceirizados. Reposicionada para depois do núcleo operacional (Fases 2-6: modelo unificado de OS, prestadores com cobertura, WhatsApp, kanban/automações e visões de entrega/retirada/pendência) — preços, conciliação e repasse fazem mais sentido, com menos retrabalho de dado, quando já existe volume real de OS fluindo pelo pipeline unificado. Nenhum código deste módulo existe hoje no repositório.
 
 ---
 
