@@ -9,6 +9,8 @@ import { useClientes } from '@/composables/useClientes'
 import { useEquipamentos } from '@/composables/useEquipamentos'
 import { usePrestadores } from '@/composables/usePrestadores'
 import { useOrdens } from '@/composables/useOrdens'
+import { useUsuarios } from '@/composables/useUsuarios'
+import { usePresenca } from '@/composables/usePresenca'
 import { computed } from 'vue'
 
 const router = useRouter()
@@ -18,6 +20,10 @@ const { clientes } = useClientes()
 const { equipamentos } = useEquipamentos()
 const { prestadores } = usePrestadores()
 const { ordens } = useOrdens()
+const { usuarios } = useUsuarios()
+const { estaOnline } = usePresenca()
+
+const equipeOnline = computed(() => usuarios.value.filter((u) => u.ativo && estaOnline(u.uid)))
 
 const handleLogout = async () => {
   await signOut(auth)
@@ -28,7 +34,7 @@ const ordensAbertas = computed(() => ordens.value.filter(o => o.status === 'aber
 const ordensEmAndamento = computed(() => ordens.value.filter(o => o.status === 'em_andamento').length)
 const ordensHoje = computed(() => {
   const hoje = new Date().toDateString()
-  return ordens.value.filter(o => o.dataCriacao && new Date(o.dataCriacao).toDateString() === hoje).length
+  return ordens.value.filter(o => o.datas.criacao && new Date(o.datas.criacao).toDateString() === hoje).length
 })
 
 const stats = computed(() => [
@@ -65,7 +71,7 @@ const stats = computed(() => [
   {
     label: 'Prestadores',
     value: prestadores.value.length,
-    sub: `${prestadores.value.filter(p => p.status === 'ativo').length} ativos`,
+    sub: `${prestadores.value.filter(p => p.situacao === 'ativo').length} ativos`,
     icon: '👷',
     route: '/prestadores',
     color: 'from-emerald-400 to-teal-600',
@@ -131,6 +137,18 @@ const osStatusLabel: Record<string, string> = {
         </Card>
       </div>
 
+      <!-- Equipe agora (Card 14.2) -->
+      <div class="rounded-lg border border-slate-200 bg-white shadow-sm p-4 flex items-center gap-3 flex-wrap">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider shrink-0">Equipe agora</span>
+        <template v-if="equipeOnline.length > 0">
+          <span v-for="u in equipeOnline" :key="u.uid" class="inline-flex items-center gap-1.5 text-xs text-slate-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            {{ u.nome }}
+          </span>
+        </template>
+        <span v-else class="text-xs text-slate-400">Carregando presença... (atualiza a cada 30s)</span>
+      </div>
+
       <!-- Recent OS -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
@@ -159,8 +177,8 @@ const osStatusLabel: Record<string, string> = {
                 @click="$router.push('/os')"
               >
                 <td class="px-4 py-3 font-mono font-semibold text-slate-800">{{ os.numero }}</td>
-                <td class="px-4 py-3 text-slate-700">{{ os.clienteNome }}</td>
-                <td class="px-4 py-3 text-slate-600 capitalize">{{ os.tipo }}</td>
+                <td class="px-4 py-3 text-slate-700">{{ os.cliente.nome }}</td>
+                <td class="px-4 py-3 text-slate-600 capitalize">{{ os.servico.tipo }}</td>
                 <td class="px-4 py-3">
                   <Badge :class="osStatusColor[os.status]">{{ osStatusLabel[os.status] }}</Badge>
                 </td>

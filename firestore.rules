@@ -33,10 +33,11 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    // ─── Ordens de Serviço integradas (via Gateway) ───────────────
-    // Só o Gateway (backend/, com firebase-admin) escreve aqui — o front só
-    // lê. O Admin SDK ignora estas regras, então "write" segue liberado só
-    // pra manter o padrão das outras coleções; nada no front chama add/update/delete.
+    // ─── Ordens de Serviço integradas (ARQUIVADA — ver backlog Fase 2) ──
+    // Coleção congelada desde a migração pro modelo unificado (Card 9.2):
+    // o Gateway agora escreve em `ordens` (mesma coleção usada pras OS
+    // manuais). Mantida só como snapshot histórico, ninguém mais lê/escreve
+    // aqui em código — regra preservada por precaução, não removida.
     match /ordens_integradas/{ordemId} {
       allow read, write: if isAuthenticated();
     }
@@ -44,6 +45,99 @@ service cloud.firestore {
     // ─── Logs de Idempotência ────────────────────────────────────
     match /idempotencia_logs/{logId} {
       allow read, write: if isAuthenticated();
+    }
+
+    // ─── WhatsApp (backlog Fase 4) ─────────────────────────────────
+    // Mensagens enviadas/recebidas — escritas de verdade só acontecem pelo
+    // Gateway (Admin SDK, ignora estas regras); o front só lê pra montar a
+    // inbox (Card 11.5). "write" liberado só pra manter o padrão das
+    // demais coleções.
+    match /mensagens_whatsapp/{mensagemId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Payload técnico bruto de cada callback da Z-API (Card 11.2) — só o
+    // Gateway escreve; front lê pro diagnóstico (Card 11.6).
+    match /callbacks_whatsapp/{callbackId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ─── Central de Automações (backlog Fase 5) ────────────────────
+    // Configuração e fila de execução — lidas/escritas direto pelo front
+    // (sem segredo envolvido, diferente do WhatsApp). O motor no Gateway
+    // (Admin SDK) também lê/escreve ignorando estas regras.
+    match /automacoes_config/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /automacoes_fila/{filaId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ─── Configurações operacionais (backlog Fase 6) ───────────────
+    // Prazo padrão de retirada (SLA) e demais parâmetros operacionais
+    // globais — mesmo padrão de automacoes_config.
+    match /configuracoes/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ─── Financeiro (backlog Fase 7) ────────────────────────────────
+    // Tabela de preços, recebíveis (a receber das seguradoras), repasses
+    // (a pagar aos prestadores) e lotes de pagamento — mesmo padrão das
+    // demais coleções operacionais (escrita liberada pro front autenticado).
+    match /precos_servico/{precoId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /recebiveis/{recebivelId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /repasses/{repasseId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /lotes_pagamento/{loteId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ─── Governança: Usuários, Presença e Auditoria (backlog Fase 8) ──
+    function perfilDoChamador() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil;
+    }
+    function souSuperAdmin() {
+      return isAuthenticated() && perfilDoChamador() == 'super_admin';
+    }
+
+    // Perfil/ativo só mudam por Super Admin (ou pelo Gateway via Admin SDK,
+    // que ignora estas regras) — evita autopromoção. Criar o próprio doc
+    // (bootstrap no primeiro login, Card 14.1) e atualizar o próprio nome/
+    // ultimoAcessoEm continuam liberados pra si mesmo.
+    match /usuarios/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == uid;
+      allow update: if souSuperAdmin()
+        || (isAuthenticated() && request.auth.uid == uid
+            && request.resource.data.perfil == resource.data.perfil
+            && request.resource.data.ativo == resource.data.ativo);
+    }
+
+    // Doc sentinela do bootstrap (ver useUsuarioAtual.ts) — só marca se o
+    // primeiro super_admin já foi criado, pra decidir isso atomicamente
+    // mesmo com logins concorrentes.
+    match /sistema/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Heartbeat de presença ("Equipe agora", Card 14.2) — cada um só escreve
+    // o próprio ping, todo mundo autenticado lê pra saber quem tá online.
+    match /presenca/{uid} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Log de auditoria (Card 14.3) — todo mundo autenticado registra e lê;
+    // não é editável nem apagável por ninguém pelo front (log de negócio,
+    // não é a trilha imutável de infra/LGPD do Card 8.3 na Fase 10).
+    match /auditoria/{entradaId} {
+      allow read, create: if isAuthenticated();
+      allow update, delete: if false;
     }
 
     // ─── Regra de fallback: nega tudo que não foi explicitado ─────

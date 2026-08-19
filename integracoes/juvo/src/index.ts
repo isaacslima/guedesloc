@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { executarAutomacao } from './scraper'
 import { conectar, desconectar, iniciarExecucao, finalizarExecucao } from './db'
 import { definirExecucao, logger } from './logger'
+import { Sentry, sentryAtivo } from './sentry'
 
 async function main() {
   console.log('[Juvo] Iniciando automação manual...')
@@ -38,6 +39,9 @@ async function main() {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[Juvo] Erro fatal:', msg)
     logger.error('Erro fatal na execução', { erro: msg })
+    // Exceção completa (com stack) além da mensagem que já foi pro logger —
+    // essa é a falha mais grave da execução, vale a fidelidade extra no Sentry.
+    if (sentryAtivo) Sentry.captureException(err)
     await finalizarExecucao(execId, 'erro', 0, msg)
     process.exit(1)
   } finally {

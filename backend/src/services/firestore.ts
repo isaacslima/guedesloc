@@ -1,5 +1,5 @@
 import { getApps, initializeApp } from 'firebase-admin/app'
-import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 
 // initializeApp() sem argumentos usa Application Default Credentials —
 // GOOGLE_APPLICATION_CREDENTIALS apontando pra uma chave de service account,
@@ -12,7 +12,7 @@ if (getApps().length === 0) {
 }
 
 export const db = getFirestore()
-export { FieldValue }
+export { FieldValue, Timestamp }
 
 /**
  * Chaves de negócio (idempotencyKey, numeroOsSeguradora) podem conter "/" —

@@ -1,4 +1,5 @@
 import { Logging } from '@google-cloud/logging'
+import { Sentry, sentryAtivo } from './sentry.js'
 
 const LOG_NAME = process.env.LOG_NAME || 'guedesloc-gateway-backend'
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'guedesloc'
@@ -25,6 +26,13 @@ function escrever(severidade: Severidade, mensagem: string, dados?: Record<strin
   const linha = { severity: severidade, timestamp, service: LOG_NAME, mensagem, ...dados, ...(labels ? { labels } : {}) }
   const saida = severidade === 'ERROR' ? console.error : severidade === 'WARNING' ? console.warn : console.log
   saida(JSON.stringify(linha))
+
+  // Todo erro logado pelo app (não só exceção não tratada) vira issue
+  // centralizada no Sentry — é o mesmo caminho usado por praticamente todo
+  // catch do Gateway (ver index.ts, idempotency.ts).
+  if (sentryAtivo && severidade === 'ERROR') {
+    Sentry.captureMessage(mensagem, { level: 'error', extra: dados, tags: labels })
+  }
 
   if (!cloudLog) return
 

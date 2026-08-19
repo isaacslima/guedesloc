@@ -14,35 +14,46 @@ import {
   useVueTable,
   FlexRender,
 } from '@tanstack/vue-table'
-import type { Prestador } from '@/types'
+import type { Prestador, SituacaoPrestador, CidadeAtendida } from '@/types'
+import type { TipoRegraRepasse } from '@/types/financeiro'
 
 const { prestadores, addPrestador, updatePrestador, deletePrestador } = usePrestadores()
 
 const globalFilter = ref('')
 const columnHelper = createColumnHelper<Prestador>()
 
-const ESPECIALIDADES = [
-  'Eletricista', 'Mecânico', 'Técnico em Refrigeração', 'Técnico em Gerador',
-  'Encanador', 'Soldador', 'Técnico em Automação', 'Técnico em Painéis', 'Outro',
-]
+const situacaoColors: Record<SituacaoPrestador, string> = {
+  ativo: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  pausado: 'bg-amber-100 text-amber-700 border border-amber-200',
+  bloqueado: 'bg-red-100 text-red-600 border border-red-200',
+}
+const situacaoLabel: Record<SituacaoPrestador, string> = {
+  ativo: 'Ativo',
+  pausado: 'Pausado',
+  bloqueado: 'Bloqueado',
+}
 
 const columns = [
   columnHelper.accessor('nome', { header: 'Nome' }),
-  columnHelper.accessor('especialidade', {
-    header: 'Especialidade',
-    cell: (info) => h(Badge, { class: 'bg-indigo-100 text-indigo-700 border border-indigo-200' }, () => info.getValue()),
+  columnHelper.accessor('cidade', {
+    header: 'Cidade base',
+    cell: (info) => info.getValue() || h('span', { class: 'text-slate-400 text-xs italic' }, '—'),
   }),
-  columnHelper.accessor('cpf', { header: 'CPF' }),
+  columnHelper.accessor((row) => row.cidadesAtendidas.length, {
+    id: 'cobertura',
+    header: 'Cobertura',
+    cell: (info) => info.getValue() > 0
+      ? h(Badge, { class: 'bg-indigo-100 text-indigo-700 border border-indigo-200' }, () => `${info.getValue()} cidade(s)`)
+      : h('span', { class: 'text-slate-400 text-xs italic' }, 'sem cobertura'),
+  }),
   columnHelper.accessor('telefone', { header: 'Telefone' }),
-  columnHelper.accessor('email', { header: 'E-mail' }),
-  columnHelper.accessor('status', {
-    header: 'Status',
-    cell: (info) =>
-      h(Badge, {
-        class: info.getValue() === 'ativo'
-          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-          : 'bg-slate-100 text-slate-500 border border-slate-200',
-      }, () => info.getValue() === 'ativo' ? 'Ativo' : 'Inativo'),
+  columnHelper.accessor('limiteOsPorDia', {
+    header: 'Limite/dia',
+    cell: (info) => info.getValue() ?? h('span', { class: 'text-slate-400 text-xs italic' }, 'sem limite'),
+  }),
+  columnHelper.accessor('situacao', {
+    header: 'Situação',
+    cell: (info) => h(Badge, { class: situacaoColors[info.getValue()] }, () => situacaoLabel[info.getValue()]),
   }),
   columnHelper.display({
     id: 'acoes',
@@ -72,13 +83,23 @@ const isEditing = ref(false)
 const editingId = ref<string | null>(null)
 const loading = ref(false)
 
-const form = ref({
-  nome: '', especialidade: '', cpf: '', telefone: '', email: '',
-  status: 'ativo' as 'ativo' | 'inativo',
-})
+function formVazio() {
+  return {
+    nome: '', especialidade: '', cpf: '', telefone: '', email: '',
+    cidade: '', estado: '', regiao: '',
+    limiteOsPorDia: undefined as number | undefined,
+    observacao: '',
+    situacao: 'ativo' as SituacaoPrestador,
+    cidadesAtendidas: [] as CidadeAtendida[],
+    regraRepasseTipo: '' as TipoRegraRepasse | '',
+    regraRepasseValor: undefined as number | undefined,
+  }
+}
+
+const form = ref(formVazio())
 
 function resetForm() {
-  form.value = { nome: '', especialidade: '', cpf: '', telefone: '', email: '', status: 'ativo' }
+  form.value = formVazio()
   isEditing.value = false
   editingId.value = null
 }
@@ -86,7 +107,16 @@ function resetForm() {
 function openCreate() { resetForm(); showModal.value = true }
 
 function openEdit(p: Prestador) {
-  form.value = { nome: p.nome, especialidade: p.especialidade, cpf: p.cpf, telefone: p.telefone, email: p.email, status: p.status }
+  form.value = {
+    nome: p.nome, especialidade: p.especialidade ?? '', cpf: p.cpf, telefone: p.telefone, email: p.email,
+    cidade: p.cidade ?? '', estado: p.estado ?? '', regiao: p.regiao ?? '',
+    limiteOsPorDia: p.limiteOsPorDia,
+    observacao: p.observacao ?? '',
+    situacao: p.situacao,
+    cidadesAtendidas: p.cidadesAtendidas.map((c) => ({ ...c })),
+    regraRepasseTipo: p.regraRepasse?.tipo ?? '',
+    regraRepasseValor: p.regraRepasse?.valor,
+  }
   isEditing.value = true
   editingId.value = p.id
   showModal.value = true
@@ -94,14 +124,54 @@ function openEdit(p: Prestador) {
 
 function closeModal() { showModal.value = false; resetForm() }
 
+// ─── Cidades atendidas (cascata) ───────────────────────────────
+const novaCidade = ref('')
+const novoEstado = ref('')
+
+function adicionarCidade() {
+  if (!novaCidade.value.trim()) return
+  const proximaPrioridade = form.value.cidadesAtendidas.length > 0
+    ? Math.max(...form.value.cidadesAtendidas.map((c) => c.prioridade)) + 1
+    : 1
+  form.value.cidadesAtendidas.push({ cidade: novaCidade.value.trim(), estado: novoEstado.value.trim() || undefined, prioridade: proximaPrioridade })
+  novaCidade.value = ''
+  novoEstado.value = ''
+}
+
+function removerCidade(idx: number) {
+  form.value.cidadesAtendidas.splice(idx, 1)
+}
+
+function moverCidade(idx: number, direcao: -1 | 1) {
+  const alvo = idx + direcao
+  if (alvo < 0 || alvo >= form.value.cidadesAtendidas.length) return
+  const lista = form.value.cidadesAtendidas
+  const tmpPrioridade = lista[idx]!.prioridade
+  lista[idx]!.prioridade = lista[alvo]!.prioridade
+  lista[alvo]!.prioridade = tmpPrioridade
+  const tmp = lista[idx]!
+  lista[idx] = lista[alvo]!
+  lista[alvo] = tmp
+}
+
 async function submitForm() {
   if (!form.value.nome.trim()) return
   loading.value = true
   try {
+    const { regraRepasseTipo, regraRepasseValor, ...resto } = form.value
+    const input = {
+      ...resto,
+      especialidade: form.value.especialidade || undefined,
+      limiteOsPorDia: form.value.limiteOsPorDia || undefined,
+      observacao: form.value.observacao || undefined,
+      regraRepasse: regraRepasseTipo && regraRepasseValor
+        ? { tipo: regraRepasseTipo, valor: regraRepasseValor }
+        : undefined,
+    }
     if (isEditing.value && editingId.value) {
-      await updatePrestador(editingId.value, form.value)
+      await updatePrestador(editingId.value, input)
     } else {
-      await addPrestador(form.value)
+      await addPrestador(input)
     }
     closeModal()
   } finally {
@@ -128,7 +198,7 @@ async function executeDelete() {
   }
 }
 
-const totalAtivos = computed(() => prestadores.value.filter(p => p.status === 'ativo').length)
+const totalAtivos = computed(() => prestadores.value.filter(p => p.situacao === 'ativo').length)
 </script>
 
 <template>
@@ -145,7 +215,7 @@ const totalAtivos = computed(() => prestadores.value.filter(p => p.status === 'a
       </div>
 
       <div class="flex items-center gap-3">
-        <Input id="input-busca-prestador" v-model="globalFilter" placeholder="Buscar por nome, especialidade..." class="max-w-sm border-slate-200" />
+        <Input id="input-busca-prestador" v-model="globalFilter" placeholder="Buscar por nome, cidade..." class="max-w-sm border-slate-200" />
       </div>
 
       <div class="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-sm">
@@ -196,13 +266,6 @@ const totalAtivos = computed(() => prestadores.value.filter(p => p.status === 'a
             <Label for="prest-nome">Nome *</Label>
             <Input id="prest-nome" v-model="form.nome" placeholder="Nome completo" />
           </div>
-          <div class="col-span-2 space-y-1.5">
-            <Label for="prest-especialidade">Especialidade</Label>
-            <select id="prest-especialidade" v-model="form.especialidade" class="w-full h-10 rounded-md border border-slate-200 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary">
-              <option value="">Selecione...</option>
-              <option v-for="e in ESPECIALIDADES" :key="e" :value="e">{{ e }}</option>
-            </select>
-          </div>
           <div class="space-y-1.5">
             <Label for="prest-cpf">CPF</Label>
             <Input id="prest-cpf" v-model="form.cpf" placeholder="000.000.000-00" />
@@ -215,12 +278,96 @@ const totalAtivos = computed(() => prestadores.value.filter(p => p.status === 'a
             <Label for="prest-email">E-mail</Label>
             <Input id="prest-email" v-model="form.email" type="email" placeholder="prestador@email.com" />
           </div>
+          <div class="col-span-2 space-y-1.5">
+            <Label for="prest-especialidade">Observação de especialidade (opcional)</Label>
+            <Input id="prest-especialidade" v-model="form.especialidade" placeholder="Ex: caçamba pequena, guincho..." />
+          </div>
+
           <div class="space-y-1.5">
-            <Label for="prest-status">Status</Label>
-            <select id="prest-status" v-model="form.status" class="w-full h-10 rounded-md border border-slate-200 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary">
+            <Label for="prest-cidade">Cidade base</Label>
+            <Input id="prest-cidade" v-model="form.cidade" placeholder="Ex: Goiânia" />
+          </div>
+          <div class="space-y-1.5">
+            <Label for="prest-estado">Estado</Label>
+            <Input id="prest-estado" v-model="form.estado" placeholder="Ex: GO" maxlength="2" class="uppercase" />
+          </div>
+          <div class="space-y-1.5">
+            <Label for="prest-regiao">Região</Label>
+            <Input id="prest-regiao" v-model="form.regiao" placeholder="Ex: Zona Sul" />
+          </div>
+          <div class="space-y-1.5">
+            <Label for="prest-limite">Limite de OS por dia (opcional)</Label>
+            <Input id="prest-limite" v-model.number="form.limiteOsPorDia" type="number" min="0" placeholder="Sem limite" />
+          </div>
+
+          <div class="space-y-1.5">
+            <Label for="prest-situacao">Situação</Label>
+            <select id="prest-situacao" v-model="form.situacao" class="w-full h-10 rounded-md border border-slate-200 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary">
               <option value="ativo">Ativo</option>
-              <option value="inativo">Inativo</option>
+              <option value="pausado">Pausado</option>
+              <option value="bloqueado">Bloqueado</option>
             </select>
+            <p class="text-xs text-slate-400">Pausado e Bloqueado ficam fora da distribuição automática (Fase 5).</p>
+          </div>
+
+          <div class="col-span-2 space-y-1.5">
+            <Label for="prest-observacao">Observação</Label>
+            <textarea
+              id="prest-observacao"
+              v-model="form.observacao"
+              rows="2"
+              placeholder="Observações adicionais (opcional)..."
+              class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            />
+          </div>
+
+          <!-- Cidades atendidas (cascata) -->
+          <div class="col-span-2 space-y-1.5 pt-2 border-t border-slate-100">
+            <Label>Cidades atendidas (ordem de acionamento)</Label>
+            <p class="text-xs text-slate-400">Prioridade menor é chamado primeiro na cascata de distribuição. Sem cidade cadastrada, o prestador não entra na distribuição automática.</p>
+
+            <div class="border border-slate-200 rounded-md divide-y divide-slate-100">
+              <div v-if="form.cidadesAtendidas.length === 0" class="p-3 text-sm text-slate-400 italic">Nenhuma cidade cadastrada.</div>
+              <div
+                v-for="(c, idx) in form.cidadesAtendidas"
+                :key="idx"
+                class="flex items-center gap-2 px-3 py-2"
+              >
+                <Badge class="bg-slate-100 text-slate-600 border border-slate-200 text-xs shrink-0">#{{ c.prioridade }}</Badge>
+                <span class="text-sm text-slate-700 flex-1">{{ c.cidade }}<span v-if="c.estado" class="text-slate-400">/{{ c.estado }}</span></span>
+                <button type="button" class="text-slate-400 hover:text-slate-700 text-xs px-1" @click="moverCidade(idx, -1)">▲</button>
+                <button type="button" class="text-slate-400 hover:text-slate-700 text-xs px-1" @click="moverCidade(idx, 1)">▼</button>
+                <button type="button" class="text-red-400 hover:text-red-600 text-xs px-1" @click="removerCidade(idx)">Remover</button>
+              </div>
+            </div>
+
+            <div class="flex gap-2 pt-1">
+              <Input v-model="novaCidade" placeholder="Cidade" class="flex-1" @keyup.enter="adicionarCidade" />
+              <Input v-model="novoEstado" placeholder="UF" maxlength="2" class="w-16 uppercase" @keyup.enter="adicionarCidade" />
+              <Button type="button" variant="outline" size="sm" @click="adicionarCidade">+ Adicionar</Button>
+            </div>
+          </div>
+
+          <!-- Regra de repasse (Backlog Fase 7, Card 6.1) -->
+          <div class="col-span-2 space-y-1.5 pt-2 border-t border-slate-100">
+            <Label>Regra de repasse</Label>
+            <p class="text-xs text-slate-400">Como esse prestador é remunerado quando uma OS dele é finalizada. Sem regra, a OS finalizada gera um repasse sinalizado "sem regra" pra alguém revisar manualmente.</p>
+            <div class="flex gap-2">
+              <select v-model="form.regraRepasseTipo" class="flex-1 h-10 rounded-md border border-slate-200 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="">Sem regra cadastrada</option>
+                <option value="valor_fixo">Valor fixo por OS (R$)</option>
+                <option value="percentual">Percentual do valor da OS (%)</option>
+              </select>
+              <Input
+                v-if="form.regraRepasseTipo"
+                v-model.number="form.regraRepasseValor"
+                type="number"
+                min="0"
+                step="0.01"
+                :placeholder="form.regraRepasseTipo === 'percentual' ? 'Ex: 70' : 'Ex: 150.00'"
+                class="w-32"
+              />
+            </div>
           </div>
         </div>
 

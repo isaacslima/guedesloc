@@ -1,4 +1,20 @@
-import type { OrdemDeServicoCanonica } from '../types/integracao'
+/**
+ * Formato de payload que os adapters (RPA/API, ex.: integracoes/juvo) enviam
+ * pro Gateway em POST /api/v1/os/ingest — o "contrato único de OS" (backlog
+ * Fase 0, Card 1.2). É a forma de entrada (wire format), distinta do modelo
+ * unificado de armazenamento (src/types/ordem.ts::OrdemUnificada) que o
+ * Gateway grava no Firestore — o Gateway adapta uma na outra.
+ */
+export interface PayloadIngestaoOS {
+  idempotencyKey?: string
+  numeroOsSeguradora?: string
+  seguradoraId?: string
+  seguradoraNome?: string
+  status?: 'aberta' | 'em_andamento' | 'concluida' | 'cancelada'
+  cliente?: { nome?: string; endereco?: string; telefone?: string }
+  servico?: { tipo?: string; descricao?: string; valor?: number }
+  datas?: { criacao?: string; agendamento?: string }
+}
 
 export interface ValidationResult {
   valid: boolean
@@ -12,7 +28,7 @@ export function validarOSCanonica(payload: unknown): ValidationResult {
     return { valid: false, errors: ['Payload deve ser um objeto válido.'] }
   }
 
-  const data = payload as Partial<OrdemDeServicoCanonica>
+  const data = payload as Partial<PayloadIngestaoOS>
 
   if (!data.numeroOsSeguradora || typeof data.numeroOsSeguradora !== 'string' || !data.numeroOsSeguradora.trim()) {
     errors.push('Campo obrigatorio ausente ou invalido: numeroOsSeguradora')
@@ -48,7 +64,7 @@ export function validarOSCanonica(payload: unknown): ValidationResult {
     }
   }
 
-  const statusValidos: Array<OrdemDeServicoCanonica['status']> = ['aberta', 'em_andamento', 'concluida', 'cancelada']
+  const statusValidos: Array<NonNullable<PayloadIngestaoOS['status']>> = ['aberta', 'em_andamento', 'concluida', 'cancelada']
   if (!data.status || !statusValidos.includes(data.status)) {
     errors.push(`Campo status invalido. Valores aceitos: ${statusValidos.join(', ')}`)
   }

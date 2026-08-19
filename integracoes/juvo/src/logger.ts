@@ -1,4 +1,5 @@
 import { Logging } from '@google-cloud/logging'
+import { Sentry, sentryAtivo } from './sentry'
 
 const LOG_NAME = process.env.LOG_NAME || 'guedesloc-juvo-rpa'
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'guedesloc'
@@ -30,6 +31,12 @@ function escrever(severidade: Severidade, mensagem: string, dados?: Record<strin
   const prefixo = execucaoId ? `[Juvo] [exec:${execucaoId}]` : '[Juvo]'
   const saida = severidade === 'ERROR' ? console.error : severidade === 'WARNING' ? console.warn : console.log
   saida(`${prefixo} ${mensagem}`, dados ?? '')
+
+  // Todo erro logado pelo RPA vira issue centralizada no Sentry — é o mesmo
+  // caminho usado por praticamente todo catch (scraper.ts, gateway.ts).
+  if (sentryAtivo && severidade === 'ERROR') {
+    Sentry.captureMessage(mensagem, { level: 'error', extra: dados, tags: execucaoId ? { execucaoId } : undefined })
+  }
 
   if (!cloudLog) return
 

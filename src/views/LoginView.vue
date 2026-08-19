@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { auth } from '@/lib/firebase'
 import { signInWithEmailAndPassword } from 'firebase/auth'
+import { registrarAuditoria } from '@/composables/useAuditoria'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,7 +20,13 @@ const handleLogin = async () => {
   isLoading.value = true
   
   try {
-    await signInWithEmailAndPassword(auth, email.value, password.value)
+    const cred = await signInWithEmailAndPassword(auth, email.value, password.value)
+    registrarAuditoria({
+      tipo: 'login',
+      descricao: 'Login no sistema',
+      usuarioUid: cred.user.uid,
+      usuarioNome: cred.user.email?.split('@')[0] ?? cred.user.email ?? 'Usuário',
+    }).catch(() => {}) // auditoria não pode travar o login se falhar
     router.push('/')
   } catch (err: any) {
     if (err.code === 'auth/invalid-credential') {

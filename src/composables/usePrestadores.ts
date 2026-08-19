@@ -24,14 +24,25 @@ export function usePrestadores() {
     onSnapshot(q, (snap) => {
       prestadores.value = snap.docs.map((d) => {
         const data = d.data()
+        // Compatibilidade com cadastros antigos (status: ativo/inativo, sem
+        // situacao) — migração leve na leitura, sem precisar de script
+        // (backlog Fase 3, Card 10.1).
+        const situacao = data.situacao ?? (data.status === 'inativo' ? 'bloqueado' : 'ativo')
         return {
           id: d.id,
           nome: data.nome ?? '',
-          especialidade: data.especialidade ?? '',
+          especialidade: data.especialidade ?? undefined,
           telefone: data.telefone ?? '',
           email: data.email ?? '',
           cpf: data.cpf ?? '',
-          status: data.status ?? 'ativo',
+          cidade: data.cidade ?? undefined,
+          estado: data.estado ?? undefined,
+          regiao: data.regiao ?? undefined,
+          limiteOsPorDia: typeof data.limiteOsPorDia === 'number' ? data.limiteOsPorDia : undefined,
+          observacao: data.observacao ?? undefined,
+          situacao,
+          cidadesAtendidas: Array.isArray(data.cidadesAtendidas) ? data.cidadesAtendidas : [],
+          regraRepasse: data.regraRepasse ?? undefined,
           criadoEm: data.criadoEm instanceof Timestamp
             ? data.criadoEm.toDate().toISOString()
             : data.criadoEm ?? new Date().toISOString(),
