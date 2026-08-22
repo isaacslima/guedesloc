@@ -2,6 +2,8 @@ import { ref } from 'vue'
 import { collection, doc, setDoc, updateDoc, onSnapshot, query, orderBy, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { buscarPrecoVigente } from './usePrecos'
+import { useUsuarioAtual } from './useUsuarioAtual'
+import { registrarAuditoria } from './useAuditoria'
 import type { Recebivel } from '@/types/financeiro'
 import type { OrdemUnificada } from '@/types/ordem'
 
@@ -91,6 +93,18 @@ export function useRecebiveis() {
       observacaoConciliacao: observacao ?? null,
       dataConciliacao: new Date().toISOString(),
     })
+
+    // Ação sensível (Backlog Fase 10, Card 8.3 — LGPD): alteração de valor.
+    const { usuarioAtual } = useUsuarioAtual()
+    registrarAuditoria({
+      tipo: 'valor_alterado',
+      descricao: `Valor confirmado registrado pra OS ${atual.osNumero}: R$ ${valorConfirmado.toFixed(2)} (status: ${status})`,
+      usuarioUid: usuarioAtual.value?.uid ?? '',
+      usuarioNome: usuarioAtual.value?.nome ?? '',
+      entidadeTipo: 'recebivel',
+      entidadeId: recebivelId,
+      entidadeLabel: atual.osNumero,
+    }).catch(() => {})
   }
 
   return { recebiveis, sincronizarPendentes, registrarValorConfirmado }

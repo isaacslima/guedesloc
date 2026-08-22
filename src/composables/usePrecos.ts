@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import { collection, addDoc, updateDoc, onSnapshot, query, orderBy, where, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { useUsuarioAtual } from './useUsuarioAtual'
+import { registrarAuditoria } from './useAuditoria'
 import type { PrecoServico, PrecoServicoInput } from '@/types/financeiro'
 
 const precos = ref<PrecoServico[]>([])
@@ -44,6 +46,7 @@ export function usePrecos() {
       query(collection(db, 'precos_servico'), where('seguradoraId', '==', input.seguradoraId), where('servicoTipo', '==', input.servicoTipo)),
     )
     const vigenteAnterior = anteriorSnap.docs.find((d) => !d.data().vigenciaFim)
+    const valorAnterior = vigenteAnterior?.data().valor as number | undefined
     if (vigenteAnterior) {
       await updateDoc(vigenteAnterior.ref, { vigenciaFim: agora })
     }
@@ -52,6 +55,19 @@ export function usePrecos() {
       vigenciaInicio: agora,
       criadoEm: serverTimestamp(),
     })
+
+    // Ação sensível (Backlog Fase 10, Card 8.3 — LGPD): alteração de valor.
+    const { usuarioAtual } = useUsuarioAtual()
+    registrarAuditoria({
+      tipo: 'valor_alterado',
+      descricao: valorAnterior !== undefined
+        ? `Preço reajustado: ${input.seguradoraNome} / ${input.servicoTipo} — R$ ${valorAnterior.toFixed(2)} → R$ ${input.valor.toFixed(2)}`
+        : `Novo preço cadastrado: ${input.seguradoraNome} / ${input.servicoTipo} — R$ ${input.valor.toFixed(2)}`,
+      usuarioUid: usuarioAtual.value?.uid ?? '',
+      usuarioNome: usuarioAtual.value?.nome ?? '',
+      entidadeTipo: 'preco',
+      entidadeLabel: `${input.seguradoraNome} / ${input.servicoTipo}`,
+    }).catch(() => {})
   }
 
   return { precos, addPreco }

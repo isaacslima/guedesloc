@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import { executarAutomacao } from './scraper'
+import { executarComRetry } from './resiliencia'
 import { conectar, desconectar, iniciarExecucao, finalizarExecucao } from './db'
 import { definirExecucao, logger } from './logger'
 import { Sentry, sentryAtivo } from './sentry'
@@ -13,7 +14,7 @@ async function main() {
   logger.info('Execução iniciada')
 
   try {
-    const resultado = await executarAutomacao()
+    const resultado = await executarComRetry(() => executarAutomacao(), 'execução manual')
 
     await finalizarExecucao(
       execId,

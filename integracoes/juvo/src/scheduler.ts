@@ -1,7 +1,10 @@
 import 'dotenv/config'
 import cron from 'node-cron'
 import { executarAutomacao } from './scraper'
+import { executarComRetry } from './resiliencia'
 import { conectar, desconectar, iniciarExecucao, finalizarExecucao } from './db'
+import { definirExecucao, logger } from './logger'
+import { Sentry, sentryAtivo } from './sentry'
 
 const SCHEDULE = process.env.CRON_SCHEDULE || '0 6,18 * * *'
 let rodando = false
@@ -17,9 +20,11 @@ async function executarCiclo() {
 
   await conectar()
   const execId = await iniciarExecucao()
+  definirExecucao(execId)
+  logger.info('Ciclo agendado iniciado')
 
   try {
-    const resultado = await executarAutomacao()
+    const resultado = await executarComRetry(() => executarAutomacao(), 'ciclo agendado')
 
     await finalizarExecucao(
       execId,
@@ -29,9 +34,16 @@ async function executarCiclo() {
     )
 
     console.log(`[Scheduler] Ciclo finalizado. Status: ${resultado.status} | OS novas: ${resultado.osColetadas} | OS atualizadas: ${resultado.osAtualizadas}`)
+    logger.info('Ciclo agendado finalizado', {
+      status: resultado.status,
+      osNovas: resultado.osColetadas,
+      osAtualizadas: resultado.osAtualizadas,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[Scheduler] Erro no ciclo:', msg)
+    logger.error('Erro fatal no ciclo agendado (esgotou as tentativas de retry)', { erro: msg })
+    if (sentryAtivo) Sentry.captureException(err)
     await finalizarExecucao(execId, 'erro', 0, msg)
   } finally {
     rodando = false

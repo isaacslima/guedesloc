@@ -27,6 +27,10 @@ const CORES: Record<string, string> = {
   usuario_criado: 'bg-violet-100 text-violet-700 border border-violet-200',
   usuario_alterado: 'bg-violet-100 text-violet-700 border border-violet-200',
   mudanca_etapa: 'bg-amber-100 text-amber-700 border border-amber-200',
+  // Ações sensíveis (Backlog Fase 10, Card 8.3 — LGPD) — destacadas em vermelho.
+  exclusao_os: 'bg-red-100 text-red-600 border border-red-200',
+  valor_alterado: 'bg-red-100 text-red-600 border border-red-200',
+  pagamento_aprovado: 'bg-red-100 text-red-600 border border-red-200',
 }
 
 const linhas = computed<LinhaAuditoria[]>(() => {

@@ -5,6 +5,8 @@ import { usePrestadores } from '@/composables/usePrestadores'
 import { useRecebiveis } from '@/composables/useRecebiveis'
 import { useRepasses } from '@/composables/useRepasses'
 import { useLotesPagamento } from '@/composables/useLotesPagamento'
+import { useUsuarioAtual } from '@/composables/useUsuarioAtual'
+import { registrarAuditoria } from '@/composables/useAuditoria'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +20,7 @@ const { prestadores } = usePrestadores()
 const { recebiveis } = useRecebiveis()
 const { repasses, sincronizarPendentes } = useRepasses()
 const { lotes, gerarLote, marcarPago } = useLotesPagamento()
+const { usuarioAtual } = useUsuarioAtual()
 
 const aba = ref<'repasses' | 'lotes'>('repasses')
 
@@ -100,6 +103,16 @@ async function confirmarPagamento() {
   try {
     const repasseIds = repasses.value.filter((r) => r.loteId === marcandoLote.value!.id).map((r) => r.id)
     await marcarPago(marcandoLote.value.id, repasseIds, comprovanteForm.value.trim() || undefined)
+    // Ação sensível (Backlog Fase 10, Card 8.3 — LGPD): aprovação de pagamento.
+    registrarAuditoria({
+      tipo: 'pagamento_aprovado',
+      descricao: `Lote de pagamento aprovado — ${marcandoLote.value.prestadorNome}, ${formatarMoeda(marcandoLote.value.valorTotal)}, ${marcandoLote.value.totalOS} OS`,
+      usuarioUid: usuarioAtual.value?.uid ?? '',
+      usuarioNome: usuarioAtual.value?.nome ?? '',
+      entidadeTipo: 'lote_pagamento',
+      entidadeId: marcandoLote.value.id,
+      entidadeLabel: marcandoLote.value.prestadorNome,
+    }).catch(() => {})
     fecharMarcarPago()
   } finally {
     salvandoPagamento.value = false

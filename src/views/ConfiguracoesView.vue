@@ -5,6 +5,7 @@ import { writeBatch, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useUsuarioAtual } from '@/composables/useUsuarioAtual'
 import { useOrdens } from '@/composables/useOrdens'
+import { registrarAuditoria } from '@/composables/useAuditoria'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -62,6 +63,15 @@ async function executarExclusao() {
       await batch.commit()
     }
     resultadoExclusao.value = `${alvos.length} OS apagada(s).`
+    // Ação sensível (Backlog Fase 10, Card 8.3 — LGPD) — sempre auditada,
+    // uma entrada por operação (não por OS) pra não afogar o log numa
+    // exclusão em massa; a lista de números fica no próprio registro.
+    registrarAuditoria({
+      tipo: 'exclusao_os',
+      descricao: `Zona de Perigo: ${alvos.length} OS apagada(s) (modo: ${modoExclusao.value}) — ${alvos.map((o) => o.numero).slice(0, 20).join(', ')}${alvos.length > 20 ? '...' : ''}`,
+      usuarioUid: usuarioAtual.value?.uid ?? '',
+      usuarioNome: usuarioAtual.value?.nome ?? '',
+    }).catch(() => {})
     numeroAlvo.value = ''
     periodoInicio.value = ''
     periodoFim.value = ''

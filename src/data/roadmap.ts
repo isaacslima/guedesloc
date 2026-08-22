@@ -216,11 +216,46 @@ export const roadmap: FaseRoadmap[] = [
     nome: 'Escala',
     resumo: 'Repetição do processo validado para as demais seguradoras parceiras.',
     status: 'planejada',
+    pendencias: [
+      {
+        item: 'Integração com as 4 próximas seguradoras (Mawdy Brasil, Maxpar Assistências, Porto Seguro, Tokio Marine)',
+        motivo: 'Diferente da Tempo Assist (Fase 1), não existe hoje nenhum contato comercial/técnico, contrato, acesso a portal ou documentação de API com nenhuma dessas 4 seguradoras — não dá pra começar a integração sem alguém do lado de cada seguradora responder perguntas básicas (existe API? qual autenticação?).',
+        proximoPasso: 'Iniciar contato comercial com cada seguradora (geralmente pelo time de relacionamento com prestadores dela) perguntando por integração via API ou portal de prestadores. Assim que houver contato/acesso com qualquer uma delas, essa seguradora específica pode avançar sem esperar as outras três — mesmo processo de descoberta usado com a Tempo Assist.',
+      },
+    ],
   },
   {
     numero: 10,
     nome: 'Maturidade',
     resumo: 'Robustez operacional, pagamentos automáticos e conformidade com a LGPD.',
-    status: 'planejada',
+    status: 'em_andamento',
+    comoTestar: [
+      'Resiliência do RPA não tem tela — é um comportamento interno do worker que roda a integração com a Tempo Assist: se o portal falhar ou demorar, ele tenta de novo automaticamente (2-3 vezes) antes de desistir, em vez de simplesmente quebrar.',
+      'Em "Tabela de Preços", cadastre ou reajuste um preço — depois abra "Auditoria" e confira a entrada "Alteração de valor", com o valor anterior e o novo.',
+      'Em "Repasses", marque um lote como pago — confira em Auditoria a entrada "Pagamento aprovado".',
+      'Em "Configurações > Zona de Perigo", apague uma OS de teste — confira em Auditoria a entrada "Exclusão de OS".',
+    ],
+    pendencias: [
+      {
+        item: 'Armazenamento de evidências do RPA e de fotos do WhatsApp (Card 4.4)',
+        motivo: 'O produto de armazenamento de arquivos do Firebase (Cloud Storage) ainda não foi ativado no projeto — confirmado nesta sessão numa tentativa real de gravação, que retornou "bucket não existe".',
+        proximoPasso: 'Ativar o Cloud Storage no Console do Firebase (Storage > Get Started, poucos cliques, sem custo em uso baixo). Depois disso, dá pra guardar prints do RPA quando ele falha, e (gap adicional descoberto neste levantamento) começar a processar fotos de entrega enviadas pelos prestadores no WhatsApp — hoje o sistema só lê o texto das mensagens recebidas, imagens são ignoradas.',
+      },
+      {
+        item: 'Pagamento automático via PIX/banco (Card 6.3)',
+        motivo: 'Mesma pendência já registrada na Fase 7: nenhum banco ou plataforma de pagamento foi escolhido, sem credencial de API bancária. O fluxo manual (gerar lote, exportar, pagar fora do sistema, marcar como pago) já funciona — falta só a automação de disparar o PIX direto pelo sistema.',
+        proximoPasso: 'Escolher um banco ou plataforma de pagamento em lote (ex.: um banco com API PIX, ou uma plataforma como Iugu/Asaas/Celcoin) e abrir a conta/credenciamento. A partir daí é directo de conectar, seguindo o mesmo padrão já usado pra WhatsApp.',
+      },
+      {
+        item: 'Política de retenção/anonimização de dados pessoais (LGPD, Card 8.3)',
+        motivo: 'É uma decisão legal/de negócio (prazo de guarda dos dados, o que precisa ser anonimizado e quando) — não uma decisão técnica que deva ser tomada sem vocês (idealmente com apoio jurídico). O mecanismo técnico de log de auditoria (quem fez o quê, quando, em ações sensíveis) já está pronto e funcionando.',
+        proximoPasso: 'Definir com apoio jurídico a política de retenção/anonimização; depois disso, aplicar como regra técnica (ex.: anonimizar dados de cliente de OS com mais de X anos) é um trabalho direto de implementar em cima do que já existe.',
+      },
+      {
+        item: 'Rotação automática de credenciais via Secret Manager (Card 8.4)',
+        motivo: 'O cronograma de rotação já está documentado (quais credenciais existem, com que frequência trocar, como trocar cada uma). A automação via Secret Manager do Google Cloud depende de migrar as credenciais dos arquivos .env atuais pra lá — um projeto de infraestrutura à parte, não uma mudança de código do produto.',
+        proximoPasso: 'Quando a prioridade de infraestrutura permitir, migrar as credenciais listadas no `backlog/fase-10-maturidade.md` pro Secret Manager e configurar rotação automática nativa dele.',
+      },
+    ],
   },
 ]
