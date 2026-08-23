@@ -22,6 +22,27 @@ import type { OrdemUnificada, OrdemUnificadaInput, HistoricoEntradaOS, OSEtapa }
 const ordens = ref<OrdemUnificada[]>([])
 let initialized = false
 
+/**
+ * Firestore rejeita `undefined` em qualquer nível (não só no topo do objeto)
+ * — campos opcionais vazios (ex.: cliente sem cidade, OS sem agendamento)
+ * viram `undefined` no formulário e quebravam o addDoc/updateDoc antes desta
+ * limpeza ser recursiva. Preserva Timestamp/FieldValue (sentinelas do SDK,
+ * não objetos literais) sem tentar recursar neles.
+ */
+function removerCamposIndefinidos<T>(valor: T): T {
+  if (Array.isArray(valor)) {
+    return valor.map((item) => removerCamposIndefinidos(item)) as unknown as T
+  }
+  if (valor !== null && typeof valor === 'object' && valor.constructor === Object) {
+    return Object.fromEntries(
+      Object.entries(valor as Record<string, unknown>)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, removerCamposIndefinidos(v)]),
+    ) as T
+  }
+  return valor
+}
+
 async function gerarNumeroOS(): Promise<string> {
   const ano = new Date().getFullYear()
   const snap = await getDocs(collection(db, 'ordens'))
@@ -109,18 +130,18 @@ export function useOrdens() {
     const historico: HistoricoEntradaOS[] = [
       { em: new Date().toISOString(), etapaAnterior: null, etapaNova: etapa, motivo: 'Criação manual' },
     ]
-    const cleanInput = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))
+    const cleanInput = removerCamposIndefinidos(input)
     await addDoc(collection(db, 'ordens'), {
       ...cleanInput,
       numero,
       etapa,
       historico,
-      datas: { ...input.datas, criacao: serverTimestamp() },
+      datas: { ...cleanInput.datas, criacao: serverTimestamp() },
     })
   }
 
   const updateOrdem = async (id: string, input: Partial<OrdemUnificadaInput>) => {
-    const cleanInput = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined))
+    const cleanInput = removerCamposIndefinidos(input)
     const atual = ordens.value.find((o) => o.id === id)
     if (input.status) {
       if (atual && atual.status !== input.status) {

@@ -111,7 +111,7 @@
 ---
 
 ### Cards 7.1 a 7.6 — Infraestrutura GCP Base
-**Status:** Não iniciado — ambiente atual roda local (`docker-compose.yml` no RPA, `.env` local no backend), sem Terraform aplicado, sem Secret Manager, sem Cloud Scheduler (RPA usa `node-cron` local via `integracoes/juvo/src/scheduler.ts`). Existe um esqueleto Terraform em `infra/terraform/` (service account do Gateway, tópicos/DLQ de Pub/Sub, secret de credenciais de integradoras, e — adicionado nesta sessão — permissão `roles/logging.logWriter` para Cloud Logging) mas ainda não é o ambiente real em uso.
+**Status:** ⚠️ Parcial — o Gateway (`backend/`) está publicado como serviço Cloud Run de verdade no projeto `guedesloc` (`gcloud run deploy guedesloc-gateway --source backend/ --region southamerica-east1`, service account dedicada `guedesloc-gateway-sa@guedesloc.iam.gserviceaccount.com` com só `roles/datastore.user`), URL pública `https://guedesloc-gateway-1012282054525.southamerica-east1.run.app`. Mas foi um **deploy manual** (`backend/Dockerfile` + `backend/.dockerignore` criados nesta sessão, sem CI/CD), sem Terraform aplicado, sem Secret Manager (env vars direto no `gcloud run deploy`), sem Cloud Scheduler (RPA continua usando `node-cron` local via `integracoes/juvo/src/scheduler.ts`), e sem separação hml/prod (um projeto GCP só, `guedesloc`). Existe um esqueleto Terraform em `infra/terraform/` (service account do Gateway, tópicos/DLQ de Pub/Sub, secret de credenciais de integradoras, permissão `roles/logging.logWriter`) mas aponta por padrão pro projeto `guedesloc-hml` e ainda não foi aplicado — o deploy real usou uma service account criada manualmente, fora do Terraform.
 **Nota de sequenciamento:** esses gaps de infra GCP real **não bloqueiam** as Fases 1-6 do roadmap — o sistema já funciona sobre o que existe hoje. Fechar com prioridade alta antes da Fase 9 (escala para múltiplas seguradoras), quando execução agendada em produção de verdade passa a ser necessária.
 
 ### Card 7.1 — Provisionamento de projeto e ambientes
@@ -125,11 +125,13 @@
 ---
 
 ### Card 7.2 — Cloud Run para serviços de API e adapters
+**Status:** ⚠️ Parcial — o Gateway roda em Cloud Run (ver Cards 7.1-7.6 acima), publicado via `gcloud run deploy --source` direto do código-fonte (Cloud Build cuida do container, sem Dockerfile customizado além do criado nesta sessão pra referência local). Os adapters (RPA `integracoes/juvo/`) continuam rodando local, não publicados.
+
 **Descrição:** Cada adapter e o Gateway rodam como serviços Cloud Run independentes, com deploy via CI/CD.
 
 **Critérios de aceite:**
-- Cada serviço tem pipeline de deploy próprio.
-- Escalonamento automático configurado (min/max instâncias).
+- Cada serviço tem pipeline de deploy próprio. ❌ Deploy do Gateway é manual (`gcloud run deploy`), sem pipeline/CI. Adapters nem publicados ainda.
+- Escalonamento automático configurado (min/max instâncias). ⚠️ Cloud Run já escala automaticamente por padrão (comportamento da plataforma), mas min/max instâncias não foram ajustados explicitamente — segue o default do serviço.
 
 ---
 

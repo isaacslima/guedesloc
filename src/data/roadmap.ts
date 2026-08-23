@@ -93,15 +93,15 @@ export const roadmap: FaseRoadmap[] = [
     comoTestar: [
       'Cadastre um prestador em "Prestadores" com telefone válido (dígitos com DDD e país, ex.: 5511999998888).',
       'Em "Distribuição", atribua esse prestador a uma OS "Aguardando distribuição".',
-      'Abra "WhatsApp" — selecione a OS no composer do topo, escolha "Distribuição" e clique "Enviar mensagem". Deve aparecer "Enviado (simulado...)" e a conversa na coluna da esquerda, com o texto certo na coluna do meio.',
-      'A resposta automática do prestador (responder 1 = aceita, 2 = recusa) só dá pra simular via requisição técnica direta por enquanto — sem conta Z-API real ainda, ninguém manda mensagem de verdade pro sistema.',
-      'Fora do escopo por enquanto: envio/recebimento reais (precisa da conta Z-API), filtros e busca na inbox, transferência de atendimento entre pessoas do time.',
+      'Abra "WhatsApp" — selecione a OS no composer do topo, escolha "Distribuição" e clique "Enviar mensagem". Com a Z-API configurada de verdade, aparece "Enviado." e a mensagem chega no WhatsApp do prestador; sem credencial configurada, aparece "Enviado (simulado...)".',
+      'A resposta do prestador (responder 1 = aceita, 2 = recusa) já foi validada com resposta real pelo WhatsApp — o backend está publicado (Cloud Run) e o webhook da Z-API aponta pra ele, então a resposta chega e aparece na inbox de verdade, sem precisar simular por requisição técnica.',
+      'Fora do escopo por enquanto: filtros e busca na inbox, transferência de atendimento entre pessoas do time.',
     ],
     pendencias: [
       {
-        item: 'Envio e recebimento reais de WhatsApp (conta Z-API)',
-        motivo: 'Ainda não existe conta/instância Z-API criada. Sem isso, todo envio fica em modo simulado (grava a mensagem mas não manda de verdade) e nenhuma resposta real de prestador chega no sistema.',
-        proximoPasso: 'Criar a conta em z-api.io, conectar um número de WhatsApp (QR code), preencher ZAPI_INSTANCE_ID/ZAPI_TOKEN em backend/.env, e cadastrar a URL do webhook do Gateway lá dentro.',
+        item: 'Conta Z-API de produção (do cliente) ainda não configurada',
+        motivo: 'O envio e recebimento reais já foram testados e confirmados de ponta a ponta (backend publicado no Cloud Run, webhook cadastrado na Z-API), mas usando uma conta Z-API de teste pessoal — o link que o cliente passou não bateu com nenhuma instância acessível na sessão de teste (Instance ID/Token diferentes), então backend aponta pra essa conta de teste, não pra produção.',
+        proximoPasso: 'Confirmar com o cliente a conta/instância Z-API certa (painel dele, ou reenviar o link + o Client-Token de segurança da conta de lá) e trocar ZAPI_INSTANCE_ID/ZAPI_TOKEN/ZAPI_CLIENT_TOKEN no Cloud Run (e recadastrar a URL do webhook nessa conta) antes de mandar mensagem real pra prestador de verdade.',
       },
       {
         item: 'Transferência de atendimento entre pessoas do time ("Atendido por"/"Transferir")',
