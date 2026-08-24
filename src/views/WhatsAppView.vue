@@ -40,12 +40,28 @@ interface Thread {
   ultimaMensagem: MensagemWhatsapp
 }
 
+/**
+ * Mensagens antigas podem ter `prestadorTelefone` gravado com formatos
+ * diferentes pro mesmo contato (a Z-API às vezes devolve o telefone da
+ * resposta sem DDI e/ou sem o "nono dígito" do celular — ver
+ * backend/src/services/whatsapp.ts, `chaveTelefone`). Normaliza aqui
+ * também pra agrupar essas mensagens na mesma conversa mesmo em dados já
+ * gravados antes da correção.
+ */
+function chaveTelefone(bruto: string): string {
+  const digitos = bruto.replace(/\D/g, '')
+  const semDDI = digitos.startsWith('55') && digitos.length > 11 ? digitos.slice(2) : digitos
+  if (semDDI.length === 11 && semDDI[2] === '9') return semDDI.slice(0, 2) + semDDI.slice(3)
+  return semDDI
+}
+
 const threads = computed<Thread[]>(() => {
   const porTelefone = new Map<string, MensagemWhatsapp[]>()
   for (const m of mensagens.value) {
     if (!m.prestadorTelefone) continue
-    if (!porTelefone.has(m.prestadorTelefone)) porTelefone.set(m.prestadorTelefone, [])
-    porTelefone.get(m.prestadorTelefone)!.push(m)
+    const chave = chaveTelefone(m.prestadorTelefone)
+    if (!porTelefone.has(chave)) porTelefone.set(chave, [])
+    porTelefone.get(chave)!.push(m)
   }
   const lista: Thread[] = []
   for (const [telefone, msgs] of porTelefone) {
@@ -53,7 +69,7 @@ const threads = computed<Thread[]>(() => {
     lista.push({
       telefone,
       prestadorNome: msgs.find((m) => m.prestadorNome)?.prestadorNome || telefone,
-      osId: ultima.osId,
+      osId: (msgs.find((m) => m.osId)?.osId) ?? null,
       numeroOs: msgs.find((m) => m.numeroOs)?.numeroOs,
       ultimaMensagem: ultima,
     })
@@ -65,7 +81,7 @@ const telefoneSelecionado = ref<string | null>(null)
 
 const mensagensDaThread = computed(() => {
   if (!telefoneSelecionado.value) return []
-  return mensagens.value.filter((m) => m.prestadorTelefone === telefoneSelecionado.value).slice().reverse()
+  return mensagens.value.filter((m) => chaveTelefone(m.prestadorTelefone) === telefoneSelecionado.value).slice().reverse()
 })
 
 const osDaThread = computed(() => {

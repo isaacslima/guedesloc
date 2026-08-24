@@ -5,6 +5,22 @@ import { enviarTextoZapi, zapiConfigurado } from './zapi.js'
 import type { OSEtapa } from './etapaOS.js'
 import { derivarStatusDeEtapa } from './etapaOS.js'
 
+/**
+ * Chave de correlação entre o telefone que a gente manda (com DDI 55 + o
+ * "nono dígito" do celular) e o que a Z-API devolve no webhook de resposta —
+ * que às vezes vem sem o 55 e/ou sem esse dígito extra. Sem normalizar, a
+ * mesma pessoa vira duas conversas diferentes na inbox e a resposta nunca
+ * correlaciona com a OS que originou o envio. Usada só pra correlacionar/
+ * agrupar — o envio de verdade pra Z-API continua usando o telefone
+ * completo, sem essa limpeza.
+ */
+function chaveTelefone(bruto: string): string {
+  const digitos = bruto.replace(/\D/g, '')
+  const semDDI = digitos.startsWith('55') && digitos.length > 11 ? digitos.slice(2) : digitos
+  if (semDDI.length === 11 && semDDI[2] === '9') return semDDI.slice(0, 2) + semDDI.slice(3)
+  return semDDI
+}
+
 export interface HistoricoEntradaOS {
   em: string
   etapaAnterior: OSEtapa | null
@@ -66,7 +82,7 @@ export async function enviarMensagemOS(osId: string, tipo: TipoMensagemWhatsapp,
     numeroOs: os.numero,
     prestadorId,
     prestadorNome: prestador.nome ?? '',
-    prestadorTelefone: telefone,
+    prestadorTelefone: chaveTelefone(telefone),
     direcao: 'enviada',
     tipo,
     texto,
@@ -112,13 +128,14 @@ export async function processarCallbackWhatsapp(payload: unknown): Promise<void>
   const texto = dados?.text?.message
   const telefone = dados?.phone?.replace(/\D/g, '')
   if (!texto || !telefone) return
+  const chave = chaveTelefone(telefone)
 
   // Duas igualdades (sem orderBy) não precisam de índice composto — o
   // volume de mensagens por telefone é baixo, então ordenar em memória
   // evita depender de criar índice manualmente no Firestore.
   const enviadasParaTelefone = await db
     .collection('mensagens_whatsapp')
-    .where('prestadorTelefone', '==', telefone)
+    .where('prestadorTelefone', '==', chave)
     .where('direcao', '==', 'enviada')
     .get()
 
@@ -130,7 +147,7 @@ export async function processarCallbackWhatsapp(payload: unknown): Promise<void>
 
   await db.collection('mensagens_whatsapp').add({
     osId,
-    prestadorTelefone: telefone,
+    prestadorTelefone: chave,
     direcao: 'recebida',
     tipo: 'livre',
     texto,
