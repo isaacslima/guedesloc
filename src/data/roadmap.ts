@@ -75,14 +75,8 @@ export const roadmap: FaseRoadmap[] = [
       'Abra "Distribuição" — a aba "Aguardando distribuição" deve listar as OS sem prestador.',
       'Escolha um prestador e clique "Atribuir" — a OS deve sumir dessa aba e aparecer em "Aguardando confirmação".',
       'Na aba "Aguardando confirmação", teste "Confirmar aceite" (a OS sai da lista) e "Recusou, redistribuir" (a OS volta pra "Aguardando distribuição").',
+      'Em "Prestadores", clique "Importar do Google" — conecte a conta Google de quem administra os prestadores, busque os contatos da agenda, marque quais são prestadores de verdade e importe. Contatos já importados aparecem bloqueados numa nova busca (sem duplicar).',
       'Fora do escopo por enquanto: distribuição automática de verdade e confirmação por WhatsApp — hoje é tudo manual.',
-    ],
-    pendencias: [
-      {
-        item: 'Importar contatos de prestador direto da agenda do Google (Card 10.5)',
-        motivo: 'Hoje os contatos de prestador do cliente ficam concentrados na agenda pessoal do Gmail dele, fora da plataforma. Buscar isso automaticamente exige autorização OAuth do Google (People API) — não existe projeto Google Cloud nem credencial configurada pra isso ainda.',
-        proximoPasso: 'Criar/reaproveitar um projeto Google Cloud, habilitar a People API, configurar a autorização OAuth (conectando a conta Google de quem administra os prestadores hoje) e construir a tela de revisão que deixa escolher quais contatos da agenda viram prestadores de verdade antes de importar. Etapa combinada: só a importação (Google → plataforma) por enquanto — o caminho inverso (todo prestador novo virar contato no Gmail automaticamente) fica planejado como próximo passo, depois que a importação estiver funcionando.',
-      },
     ],
   },
   {

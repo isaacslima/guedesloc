@@ -140,6 +140,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Importação de contatos do Google (backlog Fase 3, Card 10.5) — guarda
+    // o refresh_token OAuth de quem administra os prestadores. Ninguém lê
+    // ou escreve pelo client SDK, nem gente autenticada; só o Gateway
+    // (Admin SDK, ignora estas regras) acessa. Vazar esse token pelo front
+    // daria acesso permanente à agenda pessoal de alguém.
+    match /integracao_google/{docId} {
+      allow read, write: if false;
+    }
+
     // ─── Regra de fallback: nega tudo que não foi explicitado ─────
     match /{document=**} {
       allow read, write: if isAuthenticated();

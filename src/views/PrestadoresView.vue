@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, h } from 'vue'
+import { ref, computed, h, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { usePrestadores } from '@/composables/usePrestadores'
+import { useGoogleContatos, type ContatoGoogle } from '@/composables/useGoogleContatos'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -199,6 +201,109 @@ async function executeDelete() {
 }
 
 const totalAtivos = computed(() => prestadores.value.filter(p => p.situacao === 'ativo').length)
+
+// ─── Importar contatos do Google (backlog Fase 3, Card 10.5) ──
+const route = useRoute()
+const router = useRouter()
+const { buscarStatus, buscarContatos, conectarGoogle } = useGoogleContatos()
+
+const showImportModal = ref(false)
+const googleStatus = ref<{ googleConfigurado: boolean; conectado: boolean } | null>(null)
+const carregandoStatus = ref(false)
+const buscandoContatos = ref(false)
+const contatosGoogle = ref<ContatoGoogle[]>([])
+const contatosBuscados = ref(false)
+const selecionados = ref(new Set<string>())
+const importando = ref(false)
+const importErro = ref('')
+
+/** Mesma normalização usada em WhatsAppView.vue pra correlacionar telefone
+ * independente de DDI/nono dígito — aqui serve pra apontar contato do
+ * Google que já é prestador cadastrado (evita duplicar na reimportação). */
+function chaveTelefone(bruto: string): string {
+  const digitos = bruto.replace(/\D/g, '')
+  const semDDI = digitos.startsWith('55') && digitos.length > 11 ? digitos.slice(2) : digitos
+  if (semDDI.length === 11 && semDDI[2] === '9') return semDDI.slice(0, 2) + semDDI.slice(3)
+  return semDDI
+}
+
+const telefonesCadastrados = computed(() => new Set(prestadores.value.map((p) => chaveTelefone(p.telefone))))
+
+function jaCadastrado(contato: ContatoGoogle): boolean {
+  return contato.telefones.some((t) => telefonesCadastrados.value.has(chaveTelefone(t)))
+}
+
+async function atualizarStatus() {
+  carregandoStatus.value = true
+  try {
+    googleStatus.value = await buscarStatus()
+  } finally {
+    carregandoStatus.value = false
+  }
+}
+
+function openImportModal() {
+  showImportModal.value = true
+  contatosGoogle.value = []
+  contatosBuscados.value = false
+  selecionados.value = new Set()
+  importErro.value = ''
+  atualizarStatus()
+}
+
+function closeImportModal() {
+  showImportModal.value = false
+}
+
+async function handleBuscarContatos() {
+  buscandoContatos.value = true
+  importErro.value = ''
+  try {
+    const resultado = await buscarContatos()
+    contatosGoogle.value = resultado.contatos
+    contatosBuscados.value = true
+  } catch (err) {
+    importErro.value = err instanceof Error ? err.message : 'Falha ao buscar contatos.'
+  } finally {
+    buscandoContatos.value = false
+  }
+}
+
+function toggleSelecionado(resourceName: string) {
+  if (selecionados.value.has(resourceName)) selecionados.value.delete(resourceName)
+  else selecionados.value.add(resourceName)
+  selecionados.value = new Set(selecionados.value)
+}
+
+async function handleImportar() {
+  importando.value = true
+  importErro.value = ''
+  try {
+    const paraImportar = contatosGoogle.value.filter((c) => selecionados.value.has(c.resourceName))
+    for (const contato of paraImportar) {
+      await addPrestador({
+        nome: contato.nome,
+        telefone: contato.telefones[0] ?? '',
+        email: contato.emails[0] ?? '',
+        cpf: '',
+        situacao: 'ativo',
+        cidadesAtendidas: [],
+      })
+    }
+    closeImportModal()
+  } catch (err) {
+    importErro.value = err instanceof Error ? err.message : 'Falha ao importar.'
+  } finally {
+    importando.value = false
+  }
+}
+
+onMounted(() => {
+  if (route.query.google === 'conectado' || route.query.google === 'erro') {
+    if (route.query.google === 'conectado') openImportModal()
+    router.replace({ query: {} })
+  }
+})
 </script>
 
 <template>
@@ -209,9 +314,14 @@ const totalAtivos = computed(() => prestadores.value.filter(p => p.situacao === 
           <h2 class="text-2xl font-bold text-slate-900">Prestadores de Serviço</h2>
           <p class="text-slate-500 text-sm mt-0.5">{{ prestadores.length }} cadastrado(s) · {{ totalAtivos }} ativo(s)</p>
         </div>
-        <Button id="btn-novo-prestador" class="bg-primary text-slate-900 hover:bg-primary/90 font-bold shadow-sm" @click="openCreate">
-          + Novo Prestador
-        </Button>
+        <div class="flex gap-2">
+          <Button id="btn-importar-google" variant="outline" class="border-slate-200" @click="openImportModal">
+            Importar do Google
+          </Button>
+          <Button id="btn-novo-prestador" class="bg-primary text-slate-900 hover:bg-primary/90 font-bold shadow-sm" @click="openCreate">
+            + Novo Prestador
+          </Button>
+        </div>
       </div>
 
       <div class="flex items-center gap-3">
@@ -390,6 +500,78 @@ const totalAtivos = computed(() => prestadores.value.filter(p => p.situacao === 
           <Button variant="outline" @click="showDeleteConfirm = false">Cancelar</Button>
           <Button variant="destructive" :disabled="deleteLoading" @click="executeDelete">{{ deleteLoading ? 'Excluindo...' : 'Excluir' }}</Button>
         </div>
+      </div>
+    </div>
+    <!-- Importar do Google (backlog Fase 3, Card 10.5) -->
+    <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-bold text-slate-900">Importar contatos do Google</h3>
+          <button class="text-slate-400 hover:text-slate-600 transition-colors" @click="closeImportModal">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <p v-if="importErro" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{{ importErro }}</p>
+
+        <!-- Estado 1: não configurado -->
+        <div v-if="!carregandoStatus && googleStatus && !googleStatus.googleConfigurado" class="text-sm text-slate-500 py-6 text-center">
+          Integração com Google ainda não configurada no backend (credenciais OAuth ausentes).
+        </div>
+
+        <!-- Estado 2: configurado, não conectado -->
+        <div v-else-if="!carregandoStatus && googleStatus && googleStatus.googleConfigurado && !googleStatus.conectado" class="text-center py-8 space-y-3">
+          <p class="text-sm text-slate-600">Conecte a conta Google de quem administra os prestadores hoje pra buscar os contatos da agenda.</p>
+          <Button class="bg-primary text-slate-900 hover:bg-primary/90 font-bold" @click="conectarGoogle">Conectar Google</Button>
+        </div>
+
+        <!-- Estado 3: conectado, sem busca ainda -->
+        <div v-else-if="!carregandoStatus && googleStatus?.conectado && !contatosBuscados" class="text-center py-8 space-y-3">
+          <p class="text-sm text-emerald-600">Google conectado.</p>
+          <Button class="bg-primary text-slate-900 hover:bg-primary/90 font-bold" :disabled="buscandoContatos" @click="handleBuscarContatos">
+            {{ buscandoContatos ? 'Buscando...' : 'Buscar contatos' }}
+          </Button>
+        </div>
+
+        <!-- Estado 4: lista carregada -->
+        <div v-else-if="contatosBuscados" class="space-y-3">
+          <p class="text-xs text-slate-400">{{ contatosGoogle.length }} contato(s) encontrado(s) — contatos sem telefone não podem ser importados. Contatos já cadastrados (telefone já existe) aparecem bloqueados.</p>
+          <div class="border border-slate-200 rounded-md divide-y divide-slate-100 max-h-96 overflow-y-auto">
+            <div v-if="contatosGoogle.length === 0" class="p-3 text-sm text-slate-400 italic">Nenhum contato encontrado na agenda.</div>
+            <label
+              v-for="c in contatosGoogle"
+              :key="c.resourceName"
+              class="flex items-center gap-3 px-3 py-2 text-sm"
+              :class="(jaCadastrado(c) || c.telefones.length === 0) ? 'opacity-50' : 'hover:bg-slate-50 cursor-pointer'"
+            >
+              <input
+                type="checkbox"
+                :disabled="jaCadastrado(c) || c.telefones.length === 0"
+                :checked="selecionados.has(c.resourceName)"
+                @change="toggleSelecionado(c.resourceName)"
+              />
+              <span class="flex-1">
+                <span class="font-medium text-slate-700">{{ c.nome }}</span>
+                <span class="text-slate-400"> — {{ c.telefones[0] || 'sem telefone' }}</span>
+                <span v-if="c.emails[0]" class="text-slate-400"> · {{ c.emails[0] }}</span>
+              </span>
+              <Badge v-if="jaCadastrado(c)" class="bg-slate-100 text-slate-500 border border-slate-200 text-xs">já cadastrado</Badge>
+            </label>
+          </div>
+          <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+            <Button variant="outline" size="sm" @click="handleBuscarContatos" :disabled="buscandoContatos">Buscar de novo</Button>
+            <Button
+              class="bg-primary text-slate-900 hover:bg-primary/90 font-bold"
+              :disabled="importando || selecionados.size === 0"
+              @click="handleImportar"
+            >
+              {{ importando ? 'Importando...' : `Importar selecionados (${selecionados.size})` }}
+            </Button>
+          </div>
+        </div>
+
+        <div v-else class="text-center py-8 text-sm text-slate-400">Carregando...</div>
       </div>
     </div>
   </DashboardLayout>

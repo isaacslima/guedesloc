@@ -18,6 +18,8 @@ import { logger } from './services/logger.js'
 import { derivarEtapaDeStatus, type OSEtapa, type OSStatus } from './services/etapaOS.js'
 import { enviarMensagemOS, processarCallbackWhatsapp, zapiConfigurado } from './services/whatsapp.js'
 import type { TipoMensagemWhatsapp } from './services/whatsappTemplates.js'
+import { gerarUrlConsentimento, trocarCodePorTokens, googleConectado, listarContatos, googleConfigurado } from './services/googleContatos.js'
+import { getAuth } from 'firebase-admin/auth'
 import { executarTick } from './services/automacoesEngine.js'
 import { criarUsuario } from './services/usuarios.js'
 
@@ -266,6 +268,60 @@ app.get('/api/v1/whatsapp/status', firebaseAuthMiddleware, async (_req: Request,
     webhookProtegido: Boolean(process.env.WHATSAPP_WEBHOOK_SECRET),
     ultimoCallbackRecebidoEm: ultimoRecebidoEm,
   })
+})
+
+// ─── Google Contatos (backlog Fase 3, Card 10.5) ────────────────
+// Importação de contatos de prestador direto da agenda pessoal do Google
+// (People API, escopo contacts.readonly). Fluxo OAuth2 server-side clássico
+// — navegação de página inteira, não fetch, então não dá pra mandar o
+// token do Firebase no header Authorization; a rota de início valida o
+// token vindo por query string.
+
+app.get('/api/v1/prestadores/google/conectar', async (req: Request, res: Response): Promise<void> => {
+  const token = req.query.token as string | undefined
+  if (!token) {
+    res.status(401).json({ sucesso: false, erro: 'Não autorizado: token Firebase ausente.' })
+    return
+  }
+  try {
+    await getAuth().verifyIdToken(token)
+  } catch {
+    res.status(401).json({ sucesso: false, erro: 'Não autorizado: token Firebase inválido ou expirado.' })
+    return
+  }
+  res.redirect(gerarUrlConsentimento())
+})
+
+app.get('/api/v1/prestadores/google/callback', async (req: Request, res: Response): Promise<void> => {
+  const code = req.query.code as string | undefined
+  const frontendOrigin = ORIGENS_PERMITIDAS[0]
+  if (!code) {
+    res.redirect(`${frontendOrigin}/prestadores?google=erro`)
+    return
+  }
+  try {
+    await trocarCodePorTokens(code)
+    res.redirect(`${frontendOrigin}/prestadores?google=conectado`)
+  } catch (error) {
+    const err = error as Error
+    logger.error('Erro ao trocar code do Google por tokens', { erro: err.message })
+    res.redirect(`${frontendOrigin}/prestadores?google=erro`)
+  }
+})
+
+app.get('/api/v1/prestadores/google/status', firebaseAuthMiddleware, async (_req: Request, res: Response): Promise<void> => {
+  res.json({ googleConfigurado, conectado: googleConfigurado && (await googleConectado()) })
+})
+
+app.get('/api/v1/prestadores/google/contatos', firebaseAuthMiddleware, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const contatos = await listarContatos()
+    res.json({ sucesso: true, contatos })
+  } catch (error) {
+    const err = error as Error
+    logger.error('Erro ao listar contatos do Google', { erro: err.message })
+    res.status(422).json({ sucesso: false, erro: err.message })
+  }
 })
 
 // ─── Central de Automações (backlog Fase 5) ─────────────────────

@@ -15,7 +15,8 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",
-    "firebase-admin": "^13.6.0"
+    "firebase-admin": "^13.6.0",
+    "googleapis": "^176.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

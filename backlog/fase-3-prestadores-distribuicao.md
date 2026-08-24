@@ -59,7 +59,11 @@
 ---
 
 ### Card 10.5 — Importação de contatos do Google (prestadores)
-**Status:** ❌ Bloqueado — depende de projeto Google Cloud + credencial OAuth, nenhum dos dois existe ainda no projeto (mesmo padrão de bloqueio do Card 5.1/Z-API na Fase 4).
+**Status:** ✅ Concluído — testado de ponta a ponta com uma conta Google real (conectar → tela de consentimento de verdade → buscar 1.000 contatos reais via People API → selecionar → importar → reimportar e confirmar que o já importado aparece bloqueado por deduplicação de telefone). Testado tanto local quanto já publicado (Cloud Run + Firebase Hosting).
+
+**Implementação:** `backend/src/services/googleContatos.ts` (OAuth2Client + People API, pacote `googleapis`), rotas em `backend/src/index.ts` (`GET /api/v1/prestadores/google/conectar|callback|status|contatos`), `src/composables/useGoogleContatos.ts` e botão "Importar do Google" + modal em `src/views/PrestadoresView.vue`. Refresh token guardado em `integracao_google/google` no Firestore, com `firestore.rules` bloqueando leitura/escrita pra qualquer client SDK (`allow read, write: if false` — só o Admin SDK do Gateway acessa).
+
+**Pendência conhecida (não bloqueante):** app OAuth segue em modo **Teste** no Google Cloud Console (não passou pela verificação do Google, que exige política de privacidade publicada e pode levar dias/semanas) — nesse modo, o `refresh_token` expira em ~7 dias, então quem conectou precisa reconectar periodicamente (clicar "Conectar Google" de novo) até decidir publicar o app em produção de verdade. Busca também não pagina (limite de 1.000 contatos por chamada, `pageSize: 1000`) — suficiente pra qualquer agenda pessoal razoável, mas contas com mais de 1.000 contatos só trazem os primeiros 1.000.
 
 **Descrição:** Hoje os contatos de prestador do cliente estão concentrados na agenda telefônica pessoal dele (conta Gmail), não no cadastro da plataforma. Este card resolve a busca/importação desses contatos pra dentro de Prestadores — decisão explícita do cliente (via 3 perguntas de escopo, respondidas nesta sessão):
 - **Direção:** só importação (Google → plataforma) nesta primeira etapa. O pedido original também mencionava "refletir na conta do Gmail" prestadores novos criados na plataforma (ou seja, o caminho inverso, plataforma → Google) — isso fica deliberadamente fora do escopo deste card, documentado abaixo como próxima etapa natural, não perdido.
@@ -95,3 +99,12 @@
 7. Criar uma OS manual pra um cliente com cidade cadastrada igual à de um prestador — na Distribuição, esse prestador deve aparecer sugerido com a prioridade certa, sem o aviso amarelo de "cidade não informada".
 
 **Fora do escopo desta fase:** distribuição automática de verdade (isso é Central de Automações, Fase 5), confirmação por WhatsApp (Fase 4) — hoje é tudo manual.
+
+### Como testar — importação de contatos do Google (Card 10.5)
+
+1. Abrir **Prestadores** e clicar em **"Importar do Google"** (botão ao lado de "+ Novo Prestador").
+2. Se aparecer "Conectar Google", clicar no botão — abre a tela de login/permissão de verdade do Google. Fazer login com a conta que administra os prestadores hoje e autorizar o acesso (só pede permissão pra "ver e baixar seus contatos", nada além disso). Se aparecer o aviso "O Google não verificou este app", é esperado (app em modo Teste) — clicar em "Continuar".
+3. Depois de autorizar, a tela volta sozinha pro app já com "Google conectado." — clicar em **"Buscar contatos"**.
+4. A lista mostra os contatos reais da agenda (nome, telefone, e-mail). Contatos sem telefone ficam desabilitados (não dá pra importar sem telefone). Marcar um ou mais contatos e clicar em **"Importar selecionados (N)"**.
+5. Conferir que os contatos marcados viraram prestadores novos na listagem (sem cobertura, sem regra de repasse — precisa preencher depois).
+6. Abrir "Importar do Google" de novo, buscar contatos de novo, e confirmar que os que já foram importados aparecem com a etiqueta **"já cadastrado"** e checkbox bloqueado (deduplicação por telefone).

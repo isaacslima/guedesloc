@@ -5,7 +5,7 @@ import { getAuth } from 'firebase/auth'
  * 11.1) — até aqui tudo era leitura via SDK do Firestore. Autentica com o
  * ID token do Firebase (validado no Gateway por `firebaseAuthMiddleware`).
  */
-const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8080'
+export const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8080'
 
 export async function chamarGateway<T>(caminho: string, opcoes: { method?: string; body?: unknown } = {}): Promise<T> {
   const usuario = getAuth().currentUser
